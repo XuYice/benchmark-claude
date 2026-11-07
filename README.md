@@ -10,7 +10,8 @@ Para coletar:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r scripts/requirements.txt
+cd ../
 cp .env.example .env
 # Preencha ANTHROPIC_API_KEY em .env
 python scripts/benchmark.py

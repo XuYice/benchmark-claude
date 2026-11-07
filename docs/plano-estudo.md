@@ -24,17 +24,27 @@ As técnicas escolhidas são **monitoramento**, para obter medições reais, e *
 
 Um piloto verificará acesso, estabilidade do tamanho das respostas, duração e limites da conta. As chamadas terão intervalo inicialmente de 5 segundos, ajustado aos limites reais de requisições e tokens por minuto. Registrar cada tentativa, inclusive erros e novas tentativas, em CSV; não incluir espera de retry na latência de uma chamada bem-sucedida. Prompts repetidos podem produzir leituras de cache; registrar seus campos de uso e separar essas observações, assim como respostas truncadas. A [documentação de limites e uso](https://platform.claude.com/docs/en/api/rate-limits) orienta esses registros.
 
-## Modelo analítico e comparação
+## Modelo analítico
 
-Como haverá apenas dois tamanhos para ajuste, usar um modelo linear simples para a latência em segundos:
+O modelo soma uma parcela fixa, o tempo associado aos tokens de entrada e uma variação aleatória:
 
 $$
-L(n) = \alpha + \beta n
+L(n) = \alpha + \beta n + \frac{D}{1000}
 $$
 
-Aqui, $n$ é o total efetivo de tokens de entrada. Ajustar $\alpha$ e $\beta$ usando apenas as repetições dos tamanhos curto e longo. Verificar a estabilidade dos tokens de saída; diferenças relevantes exigem discussão, pois também afetam a latência. Três tamanhos não fornecem base suficiente para escolher uma forma mais complexa.
+**Parâmetros:**
 
-Após fixar a equação, comparar sua previsão com as medições do tamanho médio. Relatar erro absoluto médio (MAE) e viés médio, junto à dispersão das repetições. Essa validação examina **um ponto de interpolação**; não demonstra que a relação é linear em toda a faixa nem justifica previsões para outros modelos, saídas longas ou prompts maiores.
+- $L(n)$: latência da chamada, em segundos.
+- $n$: número efetivo de tokens de entrada.
+- $\alpha$: parcela fixa estimada pela reta, em segundos.
+- $\beta$: aumento estimado da latência por token de entrada, em segundos por token.
+- $D$: variação aleatória, em milissegundos. Pode aumentar ou diminuir a latência prevista. A divisão por 1.000 converte esse valor para segundos.
+
+As medições dos prompts curto e longo definem a reta: suas repetições são usadas para estimar $\alpha$ e $\beta$. O maior desvio observado em relação à reta define a escala de $D$; para explorar cenários, sorteamos valores uniformemente entre o negativo e o positivo desse desvio, convertido para milissegundos. Essa escolha é ilustrativa: não afirma que a API siga essa distribuição nem garante um limite para chamadas futuras.
+
+## Comparação com as medições
+
+Com os parâmetros fixados, calcular a previsão linear para a média de tokens de entrada do prompt médio e compará-la com a **média das latências medidas** desse prompt. Relatar a diferença absoluta em segundos e como percentual da média medida. Mostrar os valores individuais para descrever a variação observada e usar a faixa de $D$ apenas como ilustração dos cenários do modelo. Registrar diferenças nos tokens de saída, que também afetam a latência. O prompt médio valida apenas **um ponto de interpolação**.
 
 ## Reprodução, custo e limites
 
