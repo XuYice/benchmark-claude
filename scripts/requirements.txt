@@ -1,1 +1,8 @@
 python-dotenv
+pandas
+numpy
+matplotlib
+ipykernel
+nbclient
+nbformat
+
