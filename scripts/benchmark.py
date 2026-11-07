@@ -12,7 +12,11 @@ from dotenv import load_dotenv
 
 from anthropic_api import API_VERSION, count_input_tokens, send_message
 
-MODEL = "claude-haiku-4-5-20251001"
+MODELS: list[str] = [
+    "claude-haiku-5-5",
+    "claude-sonnet-5-5",
+    "claude-opus-5-5",
+]
 REPETITIONS = 5
 INTERVAL_SECONDS = 5
 MAX_TOKENS = 32
@@ -40,17 +44,17 @@ FIELDS: list[str] = [
 
 
 def measure(
-    api_key: str, name: str, prompt: str, repetition: int, counted_input_tokens: int
+    api_key: str, model: str, name: str, prompt: str, repetition: int, counted_input_tokens: int
 ) -> dict[str, object]:
     row: dict[str, object] = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "prompt": name, "repetition": repetition,
-        "model": MODEL, "api_version": API_VERSION, "max_tokens": MAX_TOKENS,
+        "model": model, "api_version": API_VERSION, "max_tokens": MAX_TOKENS,
         "counted_input_tokens": counted_input_tokens,
     }
     start = time.perf_counter()
     try:
-        row.update(send_message(api_key, MODEL, prompt, MAX_TOKENS))
+        row.update(send_message(api_key, model, prompt, MAX_TOKENS))
     except HTTPError as exc:
         row["status"] = exc.code
         row["error"] = f"HTTP {exc.code}"
@@ -74,7 +78,8 @@ def main() -> None:
 
     # A contagem é feita uma vez por prompt, fora das latências medidas.
     counted_inputs = {
-        name: count_input_tokens(api_key, MODEL, prompt)
+        (model, name): count_input_tokens(api_key, model, prompt)
+        for model in MODELS
         for name, prompt in PROMPTS.items()
     }
 
@@ -86,21 +91,22 @@ def main() -> None:
         if file.tell() == 0:
             writer.writeheader()
 
-        rng = random.Random(42)
+        for model in MODELS:
+            rng = random.Random(42)
 
-        for repetition in range(1, REPETITIONS + 1):
+            for repetition in range(1, REPETITIONS + 1):
 
-            names = list(PROMPTS)
+                names = list(PROMPTS)
 
-            rng.shuffle(names)
+                rng.shuffle(names)
 
-            for name in names:
-                prompt = PROMPTS[name]
-                row = measure(api_key, name, prompt, repetition, counted_inputs[name])
-                writer.writerow(row)
-                file.flush()
-                print(f"{name} {repetition}/{REPETITIONS}: {row['status']} em {row['latency_s']:.3f}s")
-                time.sleep(INTERVAL_SECONDS)
+                for name in names:
+                    prompt = PROMPTS[name]
+                    row = measure(api_key, model, name, prompt, repetition, counted_inputs[(model, name)])
+                    writer.writerow(row)
+                    file.flush()
+                    print(f"{model} | {name} {repetition}/{REPETITIONS}: {row['status']} em {row['latency_s']:.3f}s")
+                    time.sleep(INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":
